@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+message HospitalRequest {
+  int32 hospital_id = 1;
+}
+
+message HospitalResponse {
+  int32 hospital_id = 1;
+  bool valid = 2;
+}
+
+message RoomRequest {
+  int32 hospital_id = 1;
+  string room_name = 2;
+}
+
+message RoomResponse {
+  int32 hospital_id = 1;
+  string room_name = 2;
+  bool valid = 3;
+}
+
+service HospitalRpcService {
+  rpc ValidateHospital (HospitalRequest) returns (HospitalResponse);
+  rpc ValidateRoom (RoomRequest) returns (RoomResponse);
+}
+
+// python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. hospital.proto

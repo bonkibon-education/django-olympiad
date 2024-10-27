@@ -1,0 +1,134 @@
+services:
+  auth_service:
+    build:
+      context: ./auth_service/
+    env_file:
+      - env/django_secrets_account.env
+      - env/django_db.env
+      - env/django_general.env
+    ports:
+      - "8081:8081"
+      - "50051:50051"
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      kibana:
+        condition: service_started
+  health_service:
+    build:
+      context: ./health_service/
+    env_file:
+      - env/django_secrets_hospital.env
+      - env/django_db.env
+      - env/django_general.env
+    ports:
+      - "8082:8082"
+      - "50052:50052"
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      kibana:
+        condition: service_started
+  schedule_service:
+    build:
+      context: ./schedule_service/
+    env_file:
+      - env/django_secrets_timetable.env
+      - env/django_db.env
+      - env/django_general.env
+    ports:
+      - "8083:8083"
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      kibana:
+        condition: service_started
+  doc_service:
+    build:
+      context: ./doc_service/
+    env_file:
+      - env/django_secrets_document.env
+      - env/django_db.env
+      - env/django_general.env
+    ports:
+      - "8084:8084"
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      es:
+        condition: service_started
+      kibana:
+        condition: service_started
+  db:
+    image: postgres:15.1
+    restart: always
+    user: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    env_file:
+      - env/db.env
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  cache:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli ping" ]
+      interval: 5s
+      timeout: 1s
+      retries: 3
+  nginx:
+    image: nginx:latest
+    build: ./nginx
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - auth_service
+      - doc_service
+      - health_service
+      - schedule_service
+    ports:
+      - "1337:80"
+
+  es:
+    image: elasticsearch:8.15.2
+    environment:
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+  kibana:
+    image: kibana:8.15.2
+    environment:
+      - ELASTICSEARCH_HOSTS=http://es:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - es
+
+volumes:
+  db-data:
+  redis-data:
+  es-data:
+    driver: local
+networks:
+  elastic:
